@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Standortanzeiger
 // @namespace    https://github.com/Glaeydar/LSS_Scripts/Standortanzeiger.user.js
-// @version      0.6
+// @version      0.7
 // @description  Zeigt die Standorte von Wachen an
 // @author       Glaeydar -edit by MissSobol
 // @match        https://www.leitstellenspiel.de/
@@ -40,6 +40,8 @@
         { label: "FW POIs", value: "amenity=fire_station" },
         { label: "RW POIs", value: "emergency=ambulance_station" },
         { label: "Pol POIs", value: "amenity=police" },
+        { label: "KH POIs", value: "amenity=hospital" },
+        { label: "WR POIs", value: "emergency=lifeguard" },
         { label: "THW POIs", value: "emergency_service=technical" }
     ];
 
@@ -88,7 +90,7 @@
                 clearPOILayer();
                 loadPOI(selectedPOIType, currentToken);
             } else {
-                console.log("Maximale Anfragenanzahl erreicht. Bitte warte bis morgen.");
+                console.log("Maximale Anfragenanzahl erreicht. Bitte warten Sie bis zum nächsten Tag.");
             }
         } else {
             clearPOILayer();

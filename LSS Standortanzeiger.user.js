@@ -88,7 +88,7 @@
                 clearPOILayer();
                 loadPOI(selectedPOIType, currentToken);
             } else {
-                console.log("Maximale Anfragenanzahl erreicht. Bitte warten Sie bis zum nächsten Tag.");
+                console.log("Maximale Anfragenanzahl erreicht. Bitte warte bis morgen.");
             }
         } else {
             clearPOILayer();

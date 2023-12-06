@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Standortanzeiger
 // @namespace    https://github.com/Glaeydar/LSS_Scripts/Standortanzeiger.user.js
-// @version      0.4
+// @version      0.6
 // @description  Zeigt die Standorte von Wachen an
 // @author       Glaeydar -edit by MissSobol
 // @match        https://www.leitstellenspiel.de/
@@ -9,84 +9,130 @@
 // @grant        none
 // ==/UserScript==
 
-(function() {
+(function () {
     'use strict';
 
     var scriptEnabled = false;
     var poiLayer;
+    var selectedPOIType = null; // Default: POIs aus
+    var requestToken = 0; // Hinzugefügte Token-Variable
 
-    // Steuerungsbutton erstellen
-    var toggleButton = document.createElement('button');
-    toggleButton.innerHTML = 'FW POI Aus';
-    toggleButton.style.padding = '0px';
-    toggleButton.style.cursor = 'pointer';
-    toggleButton.style.border = 'none';
-    toggleButton.style.background = '#3498db';
-    toggleButton.style.color = '#fff';
-    toggleButton.style.borderRadius = '0px';
-    toggleButton.addEventListener('click', function() {
-        scriptEnabled = !scriptEnabled;
-        if (scriptEnabled) {
-            toggleButton.innerHTML = 'FW POI An';
-            enableScript();
-        } else {
-            toggleButton.innerHTML = 'FW POI Aus';
-            disableScript();
-        }
+    // Zähler und Zeitpunkt des letzten Resets im Local Storage
+    var requestCounter = parseInt(localStorage.getItem('requestCounter')) || 0;
+    var lastResetTime = parseInt(localStorage.getItem('lastResetTime')) || 0;
+
+    // Überprüfen, ob ein Reset erforderlich ist (mehr als 24 Stunden vergangen)
+    if (Date.now() - lastResetTime > 24 * 60 * 60 * 1000) {
+        resetRequestCounter();
+    }
+
+    // Dropdown-Menü erstellen
+    var dropdown = document.createElement('select');
+    dropdown.style.padding = '2px';
+    dropdown.style.cursor = 'pointer';
+    dropdown.style.border = 'none';
+    dropdown.style.background = '#3498db';
+    dropdown.style.color = '#fff';
+    dropdown.style.borderRadius = '0px';
+
+    var poiTypes = [
+        { label: "POIs aus", value: "" },
+        { label: "FW POIs", value: "amenity=fire_station" },
+        { label: "RW POIs", value: "emergency=ambulance_station" },
+        { label: "Pol POIs", value: "amenity=police" },
+        { label: "THW POIs", value: "emergency_service=technical" }
+    ];
+
+    poiTypes.forEach(function (poi) {
+        var option = document.createElement('option');
+        option.value = poi.value;
+        option.text = poi.label;
+        dropdown.add(option);
+    });
+
+    dropdown.addEventListener('change', function () {
+        selectedPOIType = dropdown.value;
+        scriptEnabled = selectedPOIType === "" ? false : selectedPOIType !== "" && selectedPOIType !== ""; // Aktualisierte Überprüfung
+        updatePOI();
     });
 
     // Steuerungsbutton einfügen
     var leafletControl = document.querySelector('.leaflet-control-attribution');
-    leafletControl.appendChild(toggleButton);
+    leafletControl.appendChild(dropdown);
+
+    // Event-Listener direkt hinzufügen und entfernen
+    map.on('zoomend moveend', updatePOI);
 
     function enableScript() {
-        map.on('zoomend', updatePOI);
-        map.on('moveend', updatePOI);
+        scriptEnabled = true;
+        //console.log("Script aktiviert");
         updatePOI();
     }
 
     function disableScript() {
-        map.off('zoomend', updatePOI);
-        map.off('moveend', updatePOI);
-        clearPOILayer();
+        if (scriptEnabled) {
+            scriptEnabled = false;
+            //console.log("Script deaktiviert");
+            clearPOILayer();
+            requestToken++; // Erhöhe das Token, um die ausstehenden Anfragen abzubrechen
+        }
     }
 
     function updatePOI() {
-        if (scriptEnabled) {
+        //console.log("Update POI: scriptEnabled =", scriptEnabled, ", selectedPOIType =", selectedPOIType);
+
+        var currentToken = requestToken; // Speichere das aktuelle Token
+
+        if (scriptEnabled && selectedPOIType !== null && selectedPOIType !== "") {
+            if (requestCounter < 10000) {
+                clearPOILayer();
+                loadPOI(selectedPOIType, currentToken);
+            } else {
+                console.log("Maximale Anfragenanzahl erreicht. Bitte warten Sie bis zum nächsten Tag.");
+            }
+        } else {
             clearPOILayer();
-            loadPOI('"amenity"="fire_station"');
         }
     }
 
     function clearPOILayer() {
         if (poiLayer) {
             map.removeLayer(poiLayer);
+            //console.log("POI-Layer entfernt");
         }
     }
 
-    function loadPOI(type) {
-        console.log("loading data");
+    function loadPOI(type, currentToken) {
+        // Überprüfe, ob das Token übereinstimmt und die Option nicht "POIs aus" ist, bevor die POIs hinzugefügt werden
+        if (currentToken === requestToken && type !== null && scriptEnabled) {
+            console.log("loading data");
 
-        let overpassApiUrl = buildOverpassApiUrl(map, type);
+            incrementRequestCounter();
 
-        $.get(overpassApiUrl, function (osmDataAsXml) {
-            var resultAsGeojson = osmtogeojson(osmDataAsXml);
-            poiLayer = L.geoJson(resultAsGeojson, {
-                style: function (feature) {
-                    return {color: "#ff0000"};
-                },
-                filter: function (feature, layer) {
-                    var isPolygon = (feature.geometry) && (feature.geometry.type !== undefined) && (feature.geometry.type === "Polygon");
-                    if (isPolygon) {
-                        feature.geometry.type = "Point";
-                        var polygonCenter = L.latLngBounds(feature.geometry.coordinates[0]).getCenter();
-                        feature.geometry.coordinates = [polygonCenter.lat, polygonCenter.lng];
-                    }
-                    return true;
+            let overpassApiUrl = buildOverpassApiUrl(map, type);
+
+            $.get(overpassApiUrl, function (osmDataAsXml) {
+                // Überprüfe, ob das Token übereinstimmt, bevor die POIs hinzugefügt werden
+                if (currentToken === requestToken) {
+                    var resultAsGeojson = osmtogeojson(osmDataAsXml);
+                    poiLayer = L.geoJson(resultAsGeojson, {
+                        style: function (feature) {
+                            return { color: "#ff0000" };
+                        },
+                        filter: function (feature, layer) {
+                            var isPolygon = (feature.geometry) && (feature.geometry.type !== undefined) && (feature.geometry.type === "Polygon");
+                            if (isPolygon) {
+                                feature.geometry.type = "Point";
+                                var polygonCenter = L.latLngBounds(feature.geometry.coordinates[0]).getCenter();
+                                feature.geometry.coordinates = [polygonCenter.lat, polygonCenter.lng];
+                            }
+                            return true;
+                        }
+                    }).addTo(map);
+                    console.log("finish loading");
                 }
-            }).addTo(map);
-            console.log("finish loading");
-        });
+            });
+        }
     }
 
     function buildOverpassApiUrl(map, overpassQuery) {
@@ -98,6 +144,18 @@
         var baseUrl = 'https://overpass-api.de/api/interpreter';
         var resultUrl = baseUrl + query;
         return resultUrl;
+    }
+
+    function incrementRequestCounter() {
+        requestCounter++;
+        localStorage.setItem('requestCounter', requestCounter);
+    }
+
+    function resetRequestCounter() {
+        requestCounter = 0;
+        lastResetTime = Date.now();
+        localStorage.setItem('requestCounter', requestCounter);
+        localStorage.setItem('lastResetTime', lastResetTime);
     }
 
     // Initial setup

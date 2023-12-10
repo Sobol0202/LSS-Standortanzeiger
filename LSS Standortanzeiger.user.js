@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Standortanzeiger
 // @namespace    https://github.com/Glaeydar/LSS_Scripts/Standortanzeiger.user.js
-// @version      0.7
+// @version      0.8
 // @description  Zeigt die Standorte von Wachen an
 // @author       Glaeydar -edit by MissSobol
 // @match        https://www.leitstellenspiel.de/
@@ -117,20 +117,27 @@
                 // Überprüfe, ob das Token übereinstimmt, bevor die POIs hinzugefügt werden
                 if (currentToken === requestToken) {
                     var resultAsGeojson = osmtogeojson(osmDataAsXml);
-                    poiLayer = L.geoJson(resultAsGeojson, {
-                        style: function (feature) {
-                            return { color: "#ff0000" };
-                        },
-                        filter: function (feature, layer) {
-                            var isPolygon = (feature.geometry) && (feature.geometry.type !== undefined) && (feature.geometry.type === "Polygon");
-                            if (isPolygon) {
-                                feature.geometry.type = "Point";
-                                var polygonCenter = L.latLngBounds(feature.geometry.coordinates[0]).getCenter();
-                                feature.geometry.coordinates = [polygonCenter.lat, polygonCenter.lng];
-                            }
-                            return true;
-                        }
-                    }).addTo(map);
+poiLayer = L.geoJson(resultAsGeojson, {
+    pointToLayer: function (feature, latlng) {
+        var icon = L.icon({
+            iconUrl: 'https://www.svgrepo.com/show/302636/map-marker.svg',
+            iconSize: [50, 50], // Größe des Icons in Pixeln
+            iconAnchor: [25, 50], // Ankerpunkt des Icons, hier mitte unten
+            popupAnchor: [0, -25] // Popup-Ankerpunkt: Verschiebt das Popup relativ zum Ankerpunkt des Icons
+        });
+
+        return L.marker(latlng, { icon: icon });
+    },
+    filter: function (feature, layer) {
+        var isPolygon = (feature.geometry) && (feature.geometry.type !== undefined) && (feature.geometry.type === "Polygon");
+        if (isPolygon) {
+            feature.geometry.type = "Point";
+            var polygonCenter = L.latLngBounds(feature.geometry.coordinates[0]).getCenter();
+            feature.geometry.coordinates = [polygonCenter.lat, polygonCenter.lng];
+        }
+        return true;
+    }
+}).addTo(map);
                     console.log("finish loading");
                 }
             });

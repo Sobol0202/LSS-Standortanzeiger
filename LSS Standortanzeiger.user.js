@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Standortanzeiger
 // @namespace    https://github.com/Glaeydar/LSS_Scripts/Standortanzeiger.user.js
-// @version      0.9
+// @version      0.91
 // @description  Zeigt die Standorte von Wachen an
 // @author       Glaeydar -edit by MissSobol
 // @match        https://www.leitstellenspiel.de/
@@ -62,7 +62,9 @@
         { label: "KH POIs", value: "amenity=hospital" },
         { label: "WR POIs", value: "emergency=lifeguard" },
         { label: "THW POIs", value: "emergency_service=technical" },
-        { label: "Lst POIs", value: "emergency=control_centre" }
+        { label: "Lst POIs", value: "emergency=control_centre" },
+        { label: "BW POIs", value: "emergency=mountain_rescue" },
+        { label: "KW POIs", value: "amenity=coast_guard" }
     ];
 
     // POI-Typen für das Zusatz-Dropdown
